@@ -13,6 +13,9 @@
 @property (nonatomic) SFSpeechRecognitionTask* recognitionTask;
 @property (nonatomic) AVAudioSession* audioSession;
 @property (nonatomic) NSString *sessionId;
+@property (nonatomic) AVCaptureSession* capture;
+@property (nonatomic) AVAudioRecorder* recorder;
+
 @end
 
 @implementation Voice
@@ -63,6 +66,17 @@
 
     // Configure request so that results are returned before audio recording is finished
     self.recognitionRequest.shouldReportPartialResults = YES;
+    NSError* audioSessionError = nil;
+    self.audioSession = [AVAudioSession sharedInstance];
+    CGFloat gain = 1;
+    NSError* error;
+    if (self.audioSession.isInputGainSettable) {
+        BOOL success = [self.audioSession setInputGain:gain
+                                                 error:&error];
+        if (!success){} //error handling
+    } else {
+        NSLog(@"ios6 - cannot set input gain");
+    }
 
     [self sendEventWithName:@"onSpeechStart" body:@true];
 
@@ -97,15 +111,15 @@
             [self teardown];
         }
     }];
-
     AVAudioFormat* recordingFormat = [inputNode outputFormatForBus:0];
-
-    [inputNode installTapOnBus:0 bufferSize:1024 format:recordingFormat block:^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
+    AVAudioMixerNode *mixer = [[AVAudioMixerNode alloc] init];
+    [self.audioEngine attachNode:mixer];
+    [mixer installTapOnBus:0 bufferSize:1024 format:recordingFormat block:^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
         if (self.recognitionRequest != nil) {
             [self.recognitionRequest appendAudioPCMBuffer:buffer];
         }
     }];
-
+    [self.audioEngine connect:inputNode to:mixer format:[inputNode inputFormatForBus:0]];
     [self.audioEngine prepare];
     [self.audioEngine startAndReturnError:&audioSessionError];
     if (audioSessionError != nil) {
