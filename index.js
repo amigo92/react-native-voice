@@ -51,7 +51,7 @@ class RCTVoice {
       });
     });
   }
-  start(locale, options = {}) {
+  start(locale,meetingID,recordingID,userID,url, options = {}) {
     if (!this._loaded && !this._listeners && voiceEmitter !== null) {
       this._listeners = Object.keys(this._events)
         .map((key, index) => voiceEmitter.addListener(key, this._events[key]));
@@ -73,7 +73,7 @@ class RCTVoice {
           REQUEST_PERMISSIONS_AUTO: true,
         }, options), callback);
       } else {
-        Voice.startSpeech(locale, callback);
+        Voice.startSpeech(locale,meetingID,recordingID,userID,url, callback);
       }
     });
   }
@@ -91,6 +91,22 @@ class RCTVoice {
       });
     });
   }
+
+  toggleAppend() {
+    if (!this._loaded && !this._listeners) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve, reject) => {
+      Voice.toggleAppend((error) => {
+        if (error) {
+          reject(new Error(error));
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
   cancel() {
     if (!this._loaded && !this._listeners) {
       return Promise.resolve();
