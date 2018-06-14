@@ -22,6 +22,7 @@
 
 @property (nonatomic, strong) AVAudioRecorder *monitor;
 @property (nonatomic, strong) NSTimer *timer;
+@property (nonatomic, strong) NSTimer *timer1;
 
 @property (nonatomic, strong) NSURL *monitorURL;
 
@@ -54,87 +55,90 @@
     [self teardown];
     self.sessionId = [[NSUUID UUID] UUIDString];
     NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
-
+    
     [dateFormatter setDateFormat:@"yyyy-MM-dd'T'HH:mm:ss'Z'"];
     
     NSDate *now = [NSDate date];
     NSString *iso8601String = [dateFormatter stringFromDate:now];
     
-   
+    
     NSLocale* locale = nil;
     if ([localeStr length] > 0) {
         locale = [NSLocale localeWithLocaleIdentifier:localeStr];
     }
-
+    
     if (locale) {
         self.speechRecognizer = [[SFSpeechRecognizer alloc] initWithLocale:locale];
     } else {
         self.speechRecognizer = [[SFSpeechRecognizer alloc] init];
     }
-
+    
     self.speechRecognizer.delegate = self;
-
+    
     NSError* audioSessionError = nil;
     self.audioSession = [AVAudioSession sharedInstance];
-
+    
     if (audioSessionError != nil) {
         [self sendResult:RCTMakeError([audioSessionError localizedDescription], nil, nil) :nil :nil :nil];
         return;
     }
-
+    
     self.recognitionRequest = [[SFSpeechAudioBufferRecognitionRequest alloc] init];
     
     if (self.recognitionRequest == nil){
         [self sendResult:RCTMakeError(@"Unable to created a SFSpeechAudioBufferRecognitionRequest object", nil, nil) :nil :nil :nil];
         return;
     }
-
+    
     if (self.audioEngine == nil) {
         self.audioEngine = [[AVAudioEngine alloc] init];
     }
-
-
-//    AVAudioInputNode* inputNode = self.audioEngine.inputNode;
-//    if (inputNode == nil) {
-//        [self sendResult:RCTMakeError(@"Audio engine has no input node", nil, nil) :nil :nil :nil];
-//        return;
-//    }
-
+    
+    
+    //    AVAudioInputNode* inputNode = self.audioEngine.inputNode;
+    //    if (inputNode == nil) {
+    //        [self sendResult:RCTMakeError(@"Audio engine has no input node", nil, nil) :nil :nil :nil];
+    //        return;
+    //    }
+    
     // Configure request so that results are returned before audio recording is finished
     self.recognitionRequest.shouldReportPartialResults = YES;
-//    NSError* audioSessionError = nil;
-//    self.audioSession = [AVAudioSession sharedInstance];
-//    CGFloat gain = 1;
-//    NSError* error;
-//    if (self.audioSession.isInputGainSettable) {
-//        BOOL success = [self.audioSession setInputGain:gain
-//                                                 error:&error];
-//        if (!success){} //error handling
-//    } else {
-//        NSLog(@"ios6 - cannot set input gain");
-//    }
-//
-//    [self sendEventWithName:@"onSpeechStart" body:@true];
-
+    //    NSError* audioSessionError = nil;
+    //    self.audioSession = [AVAudioSession sharedInstance];
+    //    CGFloat gain = 1;
+    //    NSError* error;
+    //    if (self.audioSession.isInputGainSettable) {
+    //        BOOL success = [self.audioSession setInputGain:gain
+    //                                                 error:&error];
+    //        if (!success){} //error handling
+    //    } else {
+    //        NSLog(@"ios6 - cannot set input gain");
+    //    }
+    //
+    //    [self sendEventWithName:@"onSpeechStart" body:@true];
+    
     // A recognition task represents a speech recognition session.
     // We keep a reference to the task so that it can be cancelled.
     NSString *taskSessionId = self.sessionId;
     self.recognitionTask = [self.speechRecognizer recognitionTaskWithRequest:self.recognitionRequest resultHandler:^(SFSpeechRecognitionResult * _Nullable result, NSError * _Nullable error) {
-//        if (![taskSessionId isEqualToString:self.sessionId]) {
-//            // session ID has changed, so ignore any capture results and error
-//            return;
-//        }
+        //        if (![taskSessionId isEqualToString:self.sessionId]) {
+        //            // session ID has changed, so ignore any capture results and error
+        //            return;
+        //        }
+        [self.timer invalidate];
+        [self.monitor stop];
+        [self.monitor deleteRecording];
         if (error != nil && self.shouldAppendBuffers) {
             NSString *errorMessage = [NSString stringWithFormat:@"%ld/%@", error.code, [error localizedDescription]];
-//            [self sendResult:RCTMakeError(errorMessage, nil, nil) :nil :nil :nil];
-//            [self teardown];
-//            [self setupAndStartRecognizing:nil];
+            //            [self sendResult:RCTMakeError(errorMessage, nil, nil) :nil :nil :nil];
+            //            [self teardown];
+            //            [self setupAndStartRecognizing:nil];
             return;
         }
-
+        
         BOOL isFinal = result.isFinal;
         self.isFinal = isFinal;
-//        NSLog(@"%@",result.bestTranscription.formattedString);
+        NSLog(@"%@",result.bestTranscription.formattedString);
         if (result != nil) {
             NSMutableArray* transcriptionDics = [NSMutableArray new];
             for (SFTranscription* transcription in result.transcriptions) {
@@ -143,7 +147,7 @@
             self.finalTranscript = result.bestTranscription.formattedString;
             [self sendResult:nil:result.bestTranscription.formattedString :transcriptionDics :@(isFinal)];
         }
-
+        
         if (self.startTime == nil) {
             NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
             
@@ -152,10 +156,9 @@
             NSDate *now = [NSDate date];
             NSString *iso8601String = [dateFormatter stringFromDate:now];
             self.startTime = iso8601String;
-//            NSLog(@"startTime is : %@",self.startTime);
-
+            //            NSLog(@"startTime is : %@",self.startTime);
+            
         }
-        
         if (isFinal == YES) {
             NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
             
@@ -166,24 +169,25 @@
             self.endTime = iso8601String;
             [self sendData:result.bestTranscription.formattedString];
             self.startTime = nil;
-//            NSLog(@"startTime is nil");
             if (self.recognitionTask.isCancelled || self.recognitionTask.isFinishing){
                 [self sendEventWithName:@"onSpeechEnd" body:@{@"error": @false}];
             }
-//            [self teardown];
+        }
+        else{
+            [self setupTimer];
         }
     }];
-//    AVAudioFormat* recordingFormat = [inputNode outputFormatForBus:0];
-//    AVAudioMixerNode *mixer = [[AVAudioMixerNode alloc] init];
-//    [self.audioEngine attachNode:mixer];
-//    [mixer installTapOnBus:0 bufferSize:1024 format:recordingFormat block:^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
-//        if (self.recognitionRequest != nil) {
-//            [self.recognitionRequest appendAudioPCMBuffer:buffer];
-//        }
-//    }];
-//    [self.audioEngine connect:inputNode to:mixer format:[inputNode inputFormatForBus:0]];
-//    [self.audioEngine prepare];
-//    [self.audioEngine startAndReturnError:&audioSessionError];
+    //    AVAudioFormat* recordingFormat = [inputNode outputFormatForBus:0];
+    //    AVAudioMixerNode *mixer = [[AVAudioMixerNode alloc] init];
+    //    [self.audioEngine attachNode:mixer];
+    //    [mixer installTapOnBus:0 bufferSize:1024 format:recordingFormat block:^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
+    //        if (self.recognitionRequest != nil) {
+    //            [self.recognitionRequest appendAudioPCMBuffer:buffer];
+    //        }
+    //    }];
+    //    [self.audioEngine connect:inputNode to:mixer format:[inputNode inputFormatForBus:0]];
+    //    [self.audioEngine prepare];
+    //    [self.audioEngine startAndReturnError:&audioSessionError];
     if (audioSessionError != nil) {
         [self sendResult:RCTMakeError([audioSessionError localizedDescription], nil, nil) :nil :nil :nil];
         return;
@@ -193,32 +197,33 @@
 - (NSArray<NSString *> *)supportedEvents
 {
     return @[
-        @"onSpeechResults",
-        @"onSpeechStart",
-        @"onSpeechPartialResults",
-        @"onSpeechError",
-        @"onSpeechEnd",
-        @"onSpeechRecognized",
-        @"onSpeechVolumeChanged"
-    ];
+             @"onSpeechResults",
+             @"onSpeechStart",
+             @"onSpeechPartialResults",
+             @"onSpeechError",
+             @"onSpeechEnd",
+             @"onSpeechRecognized",
+             @"onSpeechVolumeChanged"
+             ];
 }
 
 - (void) sendResult:(NSDictionary*)error :(NSString*)bestTranscription :(NSArray*)transcriptions :(NSNumber*)isFinal {
-//    NSLog(@"%@", bestTranscription);
+    //    NSLog(@"%@", bestTranscription);
     if (error != nil) {
-//        [self sendEventWithName:@"onSpeechError" body:@{@"error": error}];
+        //        [self sendEventWithName:@"onSpeechError" body:@{@"error": error}];
     }
     if (bestTranscription != nil) {
-//        NSLog(@"%@",bestTranscription);
+        //        NSLog(@"%@",bestTranscription);
         //        [self sendEventWithName:@"onSpeechResults" body:@{@"value":@[bestTranscription]} ];
     }
     if (transcriptions != nil) {
-//        [self sendEventWithName:@"onSpeechPartialResults" body:@{@"value":transcriptions} ];
+        //        [self sendEventWithName:@"onSpeechPartialResults" body:@{@"value":transcriptions} ];
     }
     if (isFinal != nil) {
-//        [self sendEventWithName:@"onSpeechRecognized" body: @{@"isFinal": isFinal}];
+        //        [self sendEventWithName:@"onSpeechRecognized" body: @{@"isFinal": isFinal}];
     }
 }
+
 
 -(void)sendData:(NSString *)transcript {
     
@@ -231,23 +236,27 @@
     NSData* jsonData = [NSJSONSerialization dataWithJSONObject:userDictionary options:NSJSONWritingPrettyPrinted error: nil];
     [urlRequest setValue:[NSString stringWithFormat:@"%lu",(unsigned long)[jsonData length]] forHTTPHeaderField:@"Content-length"];
     [urlRequest setHTTPBody:jsonData];//set data
-
+    
     NSURLSession *session = [NSURLSession sharedSession];
     
+    [self.timer invalidate];
+    [self.monitor stop];
+    [self.monitor deleteRecording];
+    
     NSURLSessionDataTask *dataTask = [session dataTaskWithRequest:urlRequest completionHandler:^(NSData *data, NSURLResponse *response, NSError *error)
-    {
-        NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
-        if(httpResponse.statusCode == 200)
-        {
-            NSError *parseError = nil;
-            NSDictionary *responseDictionary = [NSJSONSerialization JSONObjectWithData:data options:0 error:&parseError];
-            NSLog(@"The response is - %@",responseDictionary);
-        }
-        else
-        {
-//            NSLog(@"Error");
-        }
-    }];
+                                      {
+                                          NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+                                          if(httpResponse.statusCode == 200)
+                                          {
+                                              NSError *parseError = nil;
+                                              NSDictionary *responseDictionary = [NSJSONSerialization JSONObjectWithData:data options:0 error:&parseError];
+                                              NSLog(@"The response is - %@",responseDictionary);
+                                          }
+                                          else
+                                          {
+                                              //            NSLog(@"Error");
+                                          }
+                                      }];
     [dataTask resume];
 }
 
@@ -256,12 +265,14 @@
     self.recognitionTask = nil;
     self.audioSession = nil;
     self.sessionId = nil;
-//    if (self.audioEngine.isRunning) {
-//        [self.audioEngine stop];
-        [self.recognitionRequest endAudio];
-//        [self.audioEngine.inputNode removeTapOnBus:0];
-//    }
-
+    //    if (self.audioEngine.isRunning) {
+    //        [self.audioEngine stop];
+    [self.recognitionRequest endAudio];
+    //        [self.audioEngine.inputNode removeTapOnBus:0];
+    //    }
+    
+    
+    
     self.recognitionRequest = nil;
 }
 
@@ -282,10 +293,10 @@ RCT_EXPORT_METHOD(stopSpeech:(RCTResponseSenderBlock)callback)
 
 RCT_EXPORT_METHOD(toggleAppend:(RCTResponseSenderBlock)callback)
 {
-//    self.shouldAppendBuffers = !self.shouldAppendBuffers;
+    //    self.shouldAppendBuffers = !self.shouldAppendBuffers;
     self.shouldAppendBuffers = YES;
-//    [self teardown];
-//    [self setupAndStartRecognizing:nil];
+    //    [self teardown];
+    //    [self setupAndStartRecognizing:nil];
     callback(@[@false]);
 }
 
@@ -300,15 +311,15 @@ RCT_EXPORT_METHOD(destroySpeech:(RCTResponseSenderBlock)callback) {
     callback(@[@false]);
     [self.timer invalidate];
     if (!self.isFinal) {
-    NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
-    
-    [dateFormatter setDateFormat:@"yyyy-MM-dd'T'HH:mm:ss'Z'"];
-    
-    NSDate *now = [NSDate date];
-    NSString *iso8601String = [dateFormatter stringFromDate:now];
-    self.endTime = iso8601String;
-//        NSLog(@"end time is : %@",self.endTime);
-    [self sendData:self.finalTranscript];
+        NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
+        
+        [dateFormatter setDateFormat:@"yyyy-MM-dd'T'HH:mm:ss'Z'"];
+        
+        NSDate *now = [NSDate date];
+        NSString *iso8601String = [dateFormatter stringFromDate:now];
+        self.endTime = iso8601String;
+        //        NSLog(@"end time is : %@",self.endTime);
+        [self sendData:self.finalTranscript];
     }
 }
 
@@ -356,11 +367,14 @@ RCT_EXPORT_METHOD(isRecognizing:(RCTResponseSenderBlock)callback) {
                 break;
             case SFSpeechRecognitionTaskStateStarting:
                 break;
-            default:
+            case SFSpeechRecognitionTaskStateFinishing:
+                break;
+            case SFSpeechRecognitionTaskStateCompleted:
+            case SFSpeechRecognitionTaskStateCanceling:
                 //                dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
                 if (self.shouldAppendBuffers && [[UIApplication sharedApplication] applicationState] == UIApplicationStateActive) {
-                [self teardown];
-                [self setupAndStartRecognizing:nil];
+                    [self teardown];
+                    [self setupAndStartRecognizing:nil];
                 }
                 //                });
         }
@@ -368,8 +382,8 @@ RCT_EXPORT_METHOD(isRecognizing:(RCTResponseSenderBlock)callback) {
     else {
         //        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         if (self.shouldAppendBuffers && [[UIApplication sharedApplication] applicationState] == UIApplicationStateActive) {
-        [self teardown];
-        [self setupAndStartRecognizing:nil];
+            [self teardown];
+            [self setupAndStartRecognizing:nil];
         }
         //        });
     }
@@ -383,18 +397,18 @@ RCT_EXPORT_METHOD(startSpeech:(NSString*)localeStr meetingID:(NSString*)meetingI
     self.recordingID = recordingID;
     self.userId = userID;
     self.urlToConnect = url;
+    [self setupRecorder];
     [AudioController sharedInstance].delegate = self;
     [[AudioController sharedInstance] prepareWithSampleRate:SAMPLE_RATE];
-    [self.audioSession setCategory:AVAudioSessionCategoryPlayAndRecord error:nil];
+    
     [[AudioController sharedInstance] start];
     self.shouldAppendBuffers = YES;
-//    [self setupRecorder];
-//    [self setupTimer];
+    //    [self setupStartSpeechTimer];
     if (self.recognitionTask != nil) {
         [self sendResult:RCTMakeError(@"Speech recognition already started!", nil, nil) :nil :nil :nil];
         return;
     }
-
+    
     [SFSpeechRecognizer requestAuthorization:^(SFSpeechRecognizerAuthorizationStatus status) {
         switch (status) {
             case SFSpeechRecognizerAuthorizationStatusNotDetermined:
@@ -414,7 +428,7 @@ RCT_EXPORT_METHOD(startSpeech:(NSString*)localeStr meetingID:(NSString*)meetingI
     callback(@[@false]);
 }
 - (void)setupRecorder {
-    [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayAndRecord error:NULL];
+    
     
     NSDictionary *recordSettings = [[NSDictionary alloc] initWithObjectsAndKeys:
                                     [NSNumber numberWithFloat: 14400.0], AVSampleRateKey,
@@ -429,7 +443,12 @@ RCT_EXPORT_METHOD(startSpeech:(NSString*)localeStr meetingID:(NSString*)meetingI
 }
 - (void)setupTimer {
     [self.monitor record];
-    self.timer = [NSTimer scheduledTimerWithTimeInterval:0.1 target:self selector:@selector(updateTimer) userInfo:nil repeats:YES];
+    self.timer = [NSTimer scheduledTimerWithTimeInterval:4 target:self selector:@selector(updateTimer) userInfo:nil repeats:YES];
+}
+
+- (void)setupStartSpeechTimer {
+    [self.monitor record];
+    self.timer1 = [NSTimer scheduledTimerWithTimeInterval:0.1 target:self selector:@selector(updateTimer) userInfo:nil repeats:YES];
 }
 
 - (void)updateTimer {
@@ -442,19 +461,19 @@ RCT_EXPORT_METHOD(startSpeech:(NSString*)localeStr meetingID:(NSString*)meetingI
     
     NSLog(@"%f", power);
     if (power > -20) {
-//        if (!self.recorder.isRecording) {
-        if (self.recognitionTask.state != SFSpeechRecognitionTaskStateRunning ) {
-        [self teardown];
-            [self setupAndStartRecognizing:nil];
-        }
-       
-//        }
+        //        if (!self.recorder.isRecording) {
+        //        if (self.recognitionTask.state != SFSpeechRecognitionTaskStateRunning ) {
+        //            [self teardown];
+        //            [self setupAndStartRecognizing:nil];
+        //        }
+        
+        //        }
     } else {
-//        if (self.recorder.isRecording) {
+        //        if (self.recorder.isRecording) {
         if (self.recognitionTask.state == SFSpeechRecognitionTaskStateRunning ) {
             [self.recognitionTask finish];
         }
-//        }
+        //        }
     }
 }
 
