@@ -231,7 +231,7 @@
     
     [urlRequest setHTTPMethod:@"POST"];
     [urlRequest setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-    [urlRequest setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+    [urlRequest setValue:@"04f79a34-f92b-5161-b56c-eda135d5aae2" forHTTPHeaderField:@"Client-ID"];
     NSDictionary *userDictionary = [[NSDictionary alloc] initWithObjectsAndKeys:self.meetingID, @"meetingId",self.startTime,@"startTime",@0.9,@"confidence",self.recordingID,@"recordingId" ,self.endTime,@"endTime",self.userId,@"SpokenBy",transcript,@"text", nil];
     NSData* jsonData = [NSJSONSerialization dataWithJSONObject:userDictionary options:NSJSONWritingPrettyPrinted error: nil];
     [urlRequest setValue:[NSString stringWithFormat:@"%lu",(unsigned long)[jsonData length]] forHTTPHeaderField:@"Content-length"];
@@ -311,15 +311,7 @@ RCT_EXPORT_METHOD(destroySpeech:(RCTResponseSenderBlock)callback) {
     callback(@[@false]);
     [self.timer invalidate];
     if (!self.isFinal) {
-        NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
-        
-        [dateFormatter setDateFormat:@"yyyy-MM-dd'T'HH:mm:ss'Z'"];
-        
-        NSDate *now = [NSDate date];
-        NSString *iso8601String = [dateFormatter stringFromDate:now];
-        self.endTime = iso8601String;
-        //        NSLog(@"end time is : %@",self.endTime);
-        [self sendData:self.finalTranscript];
+        [NSTimer scheduledTimerWithTimeInterval:4 target:self selector:@selector(sendTranscript) userInfo:nil repeats:NO];
     }
 }
 
@@ -451,6 +443,20 @@ RCT_EXPORT_METHOD(startSpeech:(NSString*)localeStr meetingID:(NSString*)meetingI
     self.timer1 = [NSTimer scheduledTimerWithTimeInterval:0.1 target:self selector:@selector(updateTimer) userInfo:nil repeats:YES];
 }
 
+- (void)sendTranscript {
+    if (!self.isFinal) {
+        NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
+        
+        [dateFormatter setDateFormat:@"yyyy-MM-dd'T'HH:mm:ss'Z'"];
+        
+        NSDate *now = [NSDate date];
+        NSString *iso8601String = [dateFormatter stringFromDate:now];
+        self.endTime = iso8601String;
+        //        NSLog(@"end time is : %@",self.endTime);
+        [self sendData:self.finalTranscript];
+    }
+}
+
 - (void)updateTimer {
     
     // 不更新就没法用了
@@ -488,3 +494,4 @@ RCT_EXPORT_MODULE()
 
 
 @end
+
