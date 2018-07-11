@@ -59,6 +59,8 @@
     [dateFormatter setDateFormat:@"yyyy-MM-dd'T'HH:mm:ss'Z'"];
     
     NSDate *now = [NSDate date];
+    NSTimeZone *timeZone = [NSTimeZone timeZoneWithAbbreviation:@"UTC"];
+    [dateFormatter setTimeZone:timeZone];
     NSString *iso8601String = [dateFormatter stringFromDate:now];
     
     
@@ -154,6 +156,8 @@
             [dateFormatter setDateFormat:@"yyyy-MM-dd'T'HH:mm:ss'Z'"];
             
             NSDate *now = [NSDate date];
+            NSTimeZone *timeZone = [NSTimeZone timeZoneWithAbbreviation:@"UTC"];
+            [dateFormatter setTimeZone:timeZone];
             NSString *iso8601String = [dateFormatter stringFromDate:now];
             self.startTime = iso8601String;
             //            NSLog(@"startTime is : %@",self.startTime);
@@ -165,6 +169,8 @@
             [dateFormatter setDateFormat:@"yyyy-MM-dd'T'HH:mm:ss'Z'"];
             
             NSDate *now = [NSDate date];
+            NSTimeZone *timeZone = [NSTimeZone timeZoneWithAbbreviation:@"UTC"];
+            [dateFormatter setTimeZone:timeZone];
             NSString *iso8601String = [dateFormatter stringFromDate:now];
             self.endTime = iso8601String;
             [self sendData:result.bestTranscription.formattedString];
@@ -173,7 +179,7 @@
                 [self sendEventWithName:@"onSpeechEnd" body:@{@"error": @false}];
             }
         }
-        else{
+        else if (result != nil){
             [self setupTimer];
         }
     }];
@@ -450,6 +456,8 @@ RCT_EXPORT_METHOD(startSpeech:(NSString*)localeStr meetingID:(NSString*)meetingI
         [dateFormatter setDateFormat:@"yyyy-MM-dd'T'HH:mm:ss'Z'"];
         
         NSDate *now = [NSDate date];
+        NSTimeZone *timeZone = [NSTimeZone timeZoneWithAbbreviation:@"UTC"];
+        [dateFormatter setTimeZone:timeZone];
         NSString *iso8601String = [dateFormatter stringFromDate:now];
         self.endTime = iso8601String;
         //        NSLog(@"end time is : %@",self.endTime);
@@ -459,10 +467,8 @@ RCT_EXPORT_METHOD(startSpeech:(NSString*)localeStr meetingID:(NSString*)meetingI
 
 - (void)updateTimer {
     
-    // 不更新就没法用了
     [self.monitor updateMeters];
     
-    // 获得0声道的音量，完全没有声音-160.0，0是最大音量
     float power = [self.monitor peakPowerForChannel:0];
     
     NSLog(@"%f", power);
@@ -494,4 +500,3 @@ RCT_EXPORT_MODULE()
 
 
 @end
-
